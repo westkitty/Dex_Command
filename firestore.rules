@@ -1,0 +1,267 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened helper primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isBoundedStringList(listVal, maxItems) {
+      return listVal is list &&
+             listVal.size() <= maxItems &&
+             (listVal.size() == 0 || listVal[0] is string);
+    }
+
+    function isValidProjectStatus(status) {
+      return status in ['ACTIVE', 'PAUSED', 'BLOCKED', 'REVIEW', 'COMPLETED', 'ARCHIVED'];
+    }
+
+    function isValidEvidenceState(state) {
+      return state in ['PLANNED', 'CLAIMED', 'OBSERVED', 'VERIFIED', 'FAILED', 'UNKNOWN'];
+    }
+
+    function isValidCloudProject(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 160 &&
+             data.description is string && data.description.size() <= 4000 &&
+             data.purpose is string && data.purpose.size() <= 2000 &&
+             data.currentObjective is string && data.currentObjective.size() <= 2000 &&
+             data.repositoryUrl is string && data.repositoryUrl.size() <= 512 &&
+             data.driveUrl is string && data.driveUrl.size() <= 512 &&
+             isBoundedStringList(data.documentationRefs, 50) &&
+             isBoundedStringList(data.storageRefs, 50) &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 80 &&
+             isBoundedStringList(data.tags, 30) &&
+             isBoundedStringList(data.protectedConstraints, 50) &&
+             isBoundedStringList(data.knownFailures, 50) &&
+             isBoundedStringList(data.openDecisions, 50) &&
+             data.status is string && isValidProjectStatus(data.status) &&
+             data.priority is int && data.priority >= 1 && data.priority <= 4 &&
+             data.lastVerifiedMilestone is string && data.lastVerifiedMilestone.size() <= 1000 &&
+             data.lastVerifiedStateSummary is string && data.lastVerifiedStateSummary.size() <= 2000 &&
+             data.demoRecord is bool &&
+             data.clientCreatedAt is int && data.clientCreatedAt >= 0 &&
+             data.lastReviewDate is int && data.lastReviewDate >= 0 &&
+             data.clientUpdatedAt is int && data.clientUpdatedAt >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCloudWorkItem(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             isValidId(data.projectId) &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.description is string && data.description.size() <= 4000 &&
+             data.priority is int && data.priority >= 1 && data.priority <= 4 &&
+             data.status is string && isValidProjectStatus(data.status) &&
+             data.evidenceState is string && isValidEvidenceState(data.evidenceState) &&
+             isBoundedStringList(data.dependencies, 50) &&
+             isBoundedStringList(data.acceptanceCriteria, 50) &&
+             isBoundedStringList(data.evidenceRefs, 50) &&
+             data.demoRecord is bool &&
+             data.clientCreatedAt is int && data.clientCreatedAt >= 0 &&
+             data.clientUpdatedAt is int && data.clientUpdatedAt >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCloudExecutionRecord(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             isValidId(data.projectId) &&
+             (!('workItemId' in data) || data.workItemId == null || isValidId(data.workItemId)) &&
+             data.toolOrAgent is string && data.toolOrAgent.size() >= 1 && data.toolOrAgent.size() <= 120 &&
+             data.actionAttempted is string && data.actionAttempted.size() >= 1 && data.actionAttempted.size() <= 2000 &&
+             data.claim is string && data.claim.size() <= 2000 &&
+             data.evidence is string && data.evidence.size() <= 4000 &&
+             data.verificationStatus is string && isValidEvidenceState(data.verificationStatus) &&
+             data.aiGeneratedStatement is bool &&
+             // Hardened rule: AI-generated statement without non-empty evidence cannot be persisted as VERIFIED
+             (!data.aiGeneratedStatement || data.verificationStatus != 'VERIFIED' || data.evidence.size() > 0) &&
+             data.demoRecord is bool &&
+             data.recordedAt is int && data.recordedAt >= 0 &&
+             data.clientUpdatedAt is int && data.clientUpdatedAt >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCloudDependencyLink(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.sourceType in ['PROJECT', 'WORK_ITEM'] &&
+             isValidId(data.sourceId) &&
+             data.targetType in ['PROJECT', 'WORK_ITEM'] &&
+             isValidId(data.targetId) &&
+             data.relationType in ['BLOCKING', 'INFORMATIONAL'] &&
+             data.notes is string && data.notes.size() <= 1000 &&
+             data.demoRecord is bool &&
+             data.clientCreatedAt is int && data.clientCreatedAt >= 0 &&
+             data.clientUpdatedAt is int && data.clientUpdatedAt >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId}/projects/{projectId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(projectId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(projectId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'name', 'description', 'purpose', 'currentObjective',
+                         'repositoryUrl', 'driveUrl', 'documentationRefs', 'storageRefs',
+                         'category', 'tags', 'protectedConstraints', 'knownFailures',
+                         'openDecisions', 'status', 'priority', 'lastVerifiedMilestone',
+                         'lastVerifiedStateSummary', 'demoRecord', 'clientCreatedAt',
+                         'lastReviewDate', 'clientUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'name', 'description', 'purpose', 'currentObjective',
+                         'repositoryUrl', 'driveUrl', 'documentationRefs', 'storageRefs',
+                         'category', 'tags', 'protectedConstraints', 'knownFailures',
+                         'openDecisions', 'status', 'priority', 'lastVerifiedMilestone',
+                         'lastVerifiedStateSummary', 'demoRecord', 'clientCreatedAt',
+                         'lastReviewDate', 'clientUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidCloudProject(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(projectId) &&
+                       isValidCloudProject(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().clientCreatedAt == existing().clientCreatedAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'name', 'description', 'purpose', 'currentObjective',
+                         'repositoryUrl', 'driveUrl', 'documentationRefs', 'storageRefs',
+                         'category', 'tags', 'protectedConstraints', 'knownFailures',
+                         'openDecisions', 'status', 'priority', 'lastVerifiedMilestone',
+                         'lastVerifiedStateSummary', 'demoRecord', 'lastReviewDate',
+                         'clientUpdatedAt', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(projectId);
+    }
+
+    match /users/{userId}/workItems/{workItemId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(workItemId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(workItemId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'projectId', 'title', 'description', 'priority', 'status',
+                         'evidenceState', 'dependencies', 'acceptanceCriteria', 'evidenceRefs',
+                         'demoRecord', 'clientCreatedAt', 'clientUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'projectId', 'title', 'description', 'priority', 'status',
+                         'evidenceState', 'dependencies', 'acceptanceCriteria', 'evidenceRefs',
+                         'demoRecord', 'clientCreatedAt', 'clientUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidCloudWorkItem(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(workItemId) &&
+                       isValidCloudWorkItem(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().projectId == existing().projectId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().clientCreatedAt == existing().clientCreatedAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'description', 'priority', 'status', 'evidenceState',
+                         'dependencies', 'acceptanceCriteria', 'evidenceRefs', 'demoRecord',
+                         'clientUpdatedAt', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(workItemId);
+    }
+
+    match /users/{userId}/executionRecords/{recordId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(recordId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(recordId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'projectId', 'toolOrAgent', 'actionAttempted', 'claim',
+                         'evidence', 'verificationStatus', 'aiGeneratedStatement', 'demoRecord',
+                         'recordedAt', 'clientUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'projectId', 'workItemId', 'toolOrAgent', 'actionAttempted',
+                         'claim', 'evidence', 'verificationStatus', 'aiGeneratedStatement',
+                         'demoRecord', 'recordedAt', 'clientUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidCloudExecutionRecord(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(recordId) &&
+                       isValidCloudExecutionRecord(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().projectId == existing().projectId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().recordedAt == existing().recordedAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'workItemId', 'toolOrAgent', 'actionAttempted', 'claim',
+                         'evidence', 'verificationStatus', 'aiGeneratedStatement',
+                         'demoRecord', 'clientUpdatedAt', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(recordId);
+    }
+
+    match /users/{userId}/dependencyLinks/{linkId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(linkId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(linkId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'sourceType', 'sourceId', 'targetType', 'targetId',
+                         'relationType', 'notes', 'demoRecord', 'clientCreatedAt',
+                         'clientUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'sourceType', 'sourceId', 'targetType', 'targetId',
+                         'relationType', 'notes', 'demoRecord', 'clientCreatedAt',
+                         'clientUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidCloudDependencyLink(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(linkId) &&
+                       isValidCloudDependencyLink(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().clientCreatedAt == existing().clientCreatedAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'sourceType', 'sourceId', 'targetType', 'targetId',
+                         'relationType', 'notes', 'demoRecord', 'clientUpdatedAt', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(linkId);
+    }
+  }
+}

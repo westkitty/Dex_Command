@@ -1,0 +1,6 @@
+{
+  "name": "Dex//Command",
+  "description": "Offline-first project control deck for managing repositories, work items, execution evidence, dependencies, continuity recovery, and coding agent prompts, with optional Firebase sync and Gemini analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

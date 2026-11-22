@@ -1,0 +1,154 @@
+{
+  "entities": {
+    "CloudProject": {
+      "title": "CloudProject",
+      "description": "User-owned synchronized DEX//COMMAND project record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "name": { "type": "string", "description": "Project title (1-160 chars)" },
+        "description": { "type": "string", "description": "Project overview" },
+        "purpose": { "type": "string", "description": "Core project mission/purpose" },
+        "currentObjective": { "type": "string", "description": "Current operational objective" },
+        "repositoryUrl": { "type": "string", "description": "GitHub repository URL" },
+        "driveUrl": { "type": "string", "description": "Google Drive reference URL" },
+        "documentationRefs": { "type": "array", "description": "Bounded list of documentation references" },
+        "storageRefs": { "type": "array", "description": "Bounded list of storage references" },
+        "category": { "type": "string", "description": "Project category" },
+        "tags": { "type": "array", "description": "Bounded list of project tags" },
+        "protectedConstraints": { "type": "array", "description": "Protected behavior constraints" },
+        "knownFailures": { "type": "array", "description": "Known unresolved failures" },
+        "openDecisions": { "type": "array", "description": "Outstanding decisions" },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED", "BLOCKED", "REVIEW", "COMPLETED", "ARCHIVED"],
+          "description": "Authoritative project status"
+        },
+        "priority": { "type": "integer", "description": "Priority rank 1 (Critical) to 4 (Low)" },
+        "lastVerifiedMilestone": { "type": "string", "description": "Last verified milestone summary" },
+        "lastVerifiedStateSummary": { "type": "string", "description": "Most recent verified state summary" },
+        "demoRecord": { "type": "boolean", "description": "Whether record originated from demo seed" },
+        "clientCreatedAt": { "type": "integer", "description": "Local creation epoch millis" },
+        "lastReviewDate": { "type": "integer", "description": "Last review epoch millis" },
+        "clientUpdatedAt": { "type": "integer", "description": "Local mutation epoch millis for conflict detection" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on create (FieldValue.serverTimestamp())" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on write (FieldValue.serverTimestamp())" }
+      },
+      "required": [
+        "userId", "name", "description", "purpose", "currentObjective",
+        "repositoryUrl", "driveUrl", "documentationRefs", "storageRefs",
+        "category", "tags", "protectedConstraints", "knownFailures", "openDecisions",
+        "status", "priority", "lastVerifiedMilestone", "lastVerifiedStateSummary",
+        "demoRecord", "clientCreatedAt", "lastReviewDate", "clientUpdatedAt",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "CloudWorkItem": {
+      "title": "CloudWorkItem",
+      "description": "User-owned synchronized work item linked to a project.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "projectId": { "type": "string", "description": "Parent project ID" },
+        "title": { "type": "string", "description": "Work item title" },
+        "description": { "type": "string", "description": "Work item detailed description" },
+        "priority": { "type": "integer", "description": "Priority 1..4" },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED", "BLOCKED", "REVIEW", "COMPLETED", "ARCHIVED"],
+          "description": "Work item operational status"
+        },
+        "evidenceState": {
+          "type": "string",
+          "enum": ["PLANNED", "CLAIMED", "OBSERVED", "VERIFIED", "FAILED", "UNKNOWN"],
+          "description": "Verification evidence classification"
+        },
+        "dependencies": { "type": "array", "description": "Referenced dependency IDs" },
+        "acceptanceCriteria": { "type": "array", "description": "Acceptance criteria list" },
+        "evidenceRefs": { "type": "array", "description": "Verification evidence references" },
+        "demoRecord": { "type": "boolean", "description": "Whether record originated from demo seed" },
+        "clientCreatedAt": { "type": "integer", "description": "Local creation epoch millis" },
+        "clientUpdatedAt": { "type": "integer", "description": "Local mutation epoch millis" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on create (FieldValue.serverTimestamp())" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on write (FieldValue.serverTimestamp())" }
+      },
+      "required": [
+        "userId", "projectId", "title", "description", "priority", "status",
+        "evidenceState", "dependencies", "acceptanceCriteria", "evidenceRefs",
+        "demoRecord", "clientCreatedAt", "clientUpdatedAt", "createdAt", "updatedAt"
+      ]
+    },
+    "CloudExecutionRecord": {
+      "title": "CloudExecutionRecord",
+      "description": "User-owned synchronized execution ledger record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "projectId": { "type": "string", "description": "Parent project ID" },
+        "workItemId": { "type": "string", "description": "Optional work item ID" },
+        "toolOrAgent": { "type": "string", "description": "Tool or coding agent name" },
+        "actionAttempted": { "type": "string", "description": "Exact action attempted" },
+        "claim": { "type": "string", "description": "Claimed outcome" },
+        "evidence": { "type": "string", "description": "Observed or verified evidence" },
+        "verificationStatus": {
+          "type": "string",
+          "enum": ["PLANNED", "CLAIMED", "OBSERVED", "VERIFIED", "FAILED", "UNKNOWN"],
+          "description": "Evidence verification status"
+        },
+        "aiGeneratedStatement": { "type": "boolean", "description": "Whether claim came from an AI statement" },
+        "demoRecord": { "type": "boolean", "description": "Whether record originated from demo seed" },
+        "recordedAt": { "type": "integer", "description": "Execution timestamp epoch millis" },
+        "clientUpdatedAt": { "type": "integer", "description": "Local mutation epoch millis" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on create (FieldValue.serverTimestamp())" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on write (FieldValue.serverTimestamp())" }
+      },
+      "required": [
+        "userId", "projectId", "toolOrAgent", "actionAttempted", "claim",
+        "evidence", "verificationStatus", "aiGeneratedStatement", "demoRecord",
+        "recordedAt", "clientUpdatedAt", "createdAt", "updatedAt"
+      ]
+    },
+    "CloudDependencyLink": {
+      "title": "CloudDependencyLink",
+      "description": "User-owned dependency relation between projects or work items.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "sourceType": { "type": "string", "enum": ["PROJECT", "WORK_ITEM"] },
+        "sourceId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["PROJECT", "WORK_ITEM"] },
+        "targetId": { "type": "string" },
+        "relationType": { "type": "string", "enum": ["BLOCKING", "INFORMATIONAL"] },
+        "notes": { "type": "string" },
+        "demoRecord": { "type": "boolean" },
+        "clientCreatedAt": { "type": "integer" },
+        "clientUpdatedAt": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "sourceType", "sourceId", "targetType", "targetId",
+        "relationType", "notes", "demoRecord", "clientCreatedAt",
+        "clientUpdatedAt", "createdAt", "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/CloudProject" },
+      "description": "Per-user synchronized project control records"
+    },
+    "/users/{userId}/workItems/{workItemId}": {
+      "schema": { "$ref": "#/entities/CloudWorkItem" },
+      "description": "Per-user synchronized work items"
+    },
+    "/users/{userId}/executionRecords/{recordId}": {
+      "schema": { "$ref": "#/entities/CloudExecutionRecord" },
+      "description": "Per-user synchronized execution ledger records"
+    },
+    "/users/{userId}/dependencyLinks/{linkId}": {
+      "schema": { "$ref": "#/entities/CloudDependencyLink" },
+      "description": "Per-user synchronized dependency graph links"
+    }
+  }
+}
